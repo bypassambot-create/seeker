@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: bisayakol-bot
+    env: python
+    plan: pro-ultra              # change to starter/pro if you hate sleep
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
