@@ -6,6 +6,8 @@ import time
 import json
 import uuid
 import sys
+import random
+import string
 import logging
 import io
 from datetime import datetime
@@ -373,12 +375,10 @@ def check_card(lista, url_payment_page):
 
     print("   Generating random user data...")
     try:
-        user_response = requests.get('https://randomuser.me/api/1.2/?nat=us', timeout=15)
-        user_response.raise_for_status()
-        random_user = user_response.json()['results'][0]
-        first_name = random_user['name']['first']
-        email = f"{first_name.lower()}{random.randint(100, 999)}@gmail.com"
-        print(f"   Generated User: {first_name}, Email: {email}")
+chars = string.ascii_lowercase + string.digits
+local_part = ''.join(random.choice(chars) for _ in range(15))
+email = local_part + "@gmail.com"
+        print(f"   Generated Email: {email}")
     except requests.exceptions.RequestException as e:
         error_msg = f"Error fetching random user: {e}"
         print(f"   {error_msg}")
