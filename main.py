@@ -365,31 +365,77 @@ def check_card(lista, url_payment_page):
             )
             await conn.commit()
 
-    try:
-        parsed_url = urlparse(url_payment_page)
-        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        http_referer = parsed_url.path
-        url_confirm = f"{base_url}/?wc-ajax=wc_stripe_create_and_confirm_setup_intent"
-    except Exception:
-        return ('error', f"Invalid URL format: {url_payment_page}", "")
+# small sample of first names to pick from locally
+SAMPLE_FIRST_NAMES = [
+    "alex","sam","chris","jordan","taylor","morgan","casey","jamie","drew","devon",
+    "ashley","jess","pat","lee","riley","cameron","blake","kyle","logan","peyton"
+]
+
+def generate_local_user(local_length=15):
+    """Return (first_name, email) using local random generation.
+       local_length = number of chars before @gmail.com (default 15).
+    """
+    first_name = random.choice(SAMPLE_FIRST_NAMES)
+    # create a local-part of exactly local_length characters:
+    base = first_name.lower()
+    allowed = string.ascii_lowercase + string.digits
+    if len(base) >= local_length:
+        local_part = base[:local_length]
+    else:
+        pad = ''.join(random.choice(allowed) for _ in range(local_length - len(base)))
+        local_part = base + pad
+    email = f"{local_part}@gmail.com"
+    return first_name.capitalize(), email
+
+# ---------- your existing logic (inside whatever function) ----------
+try:
+    parsed_url = urlparse(url_payment_page)
+    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    http_referer = parsed_url.path
+    url_confirm = f"{base_url}/?wc-ajax=wc_stripe_create_and_confirm_setup_intent"
+except Exception:
+    return ('error', f"Invalid URL format: {url_payment_page}", "")
 
 print("   Generating random user data...")
+# Try the remote API first, but fall back to local generator on any failure
+first_name = None
+email = None
+
 try:
-    chars = string.ascii_lowercase + string.digits
-    local_part = ''.join(random.choice(chars) for _ in range(15))
-    email = local_part + "@gmail.com"
-    print(f"   Generated Email: {email}")
+    user_response = requests.get('https://randomuser.me/api/?nat=us', timeout=10)
+    user_response.raise_for_status()
+    data = user_response.json()
+    # defensive checks in case the API shape changed
+    results = data.get('results')
+    if results and isinstance(results, list) and 'name' in results[0]:
+        random_user = results[0]
+        first_name = random_user['name'].get('first', '').strip() or None
+        # if API gives a short name, we'll still ensure 15-char local-part below
+        candidate = (first_name.lower() if first_name else '') + str(random.randint(100, 999))
+        # build exactly 15 chars before @gmail.com:
+        allowed = string.ascii_lowercase + string.digits
+        if len(candidate) >= 15:
+            local_part = candidate[:15]
+        else:
+            pad = ''.join(random.choice(allowed) for _ in range(15 - len(candidate)))
+            local_part = candidate + pad
+        email = f"{local_part}@gmail.com"
+        print(f"   Generated User (from API): {first_name}, Email: {email}")
+    else:
+        # treat as failure and fall back
+        raise ValueError("Unexpected API response shape")
 
-except requests.exceptions.RequestException as e:
-    error_msg = f"Error fetching random user: {e}"
-    print(f"   {error_msg}")
-    return ('error', error_msg, "")
+except Exception as e:
+    # Log the error, then fall back to local generation
+    print(f"   Warning: remote user API failed ({e}). Falling back to local generator.")
+    first_name, email = generate_local_user(local_length=15)
+    print(f"   Generated User (local fallback): {first_name}, Email: {email}")
 
-
-    with requests.Session() as session:
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
+# now you have `first_name` and `email` guaranteed; continue with your session logic
+with requests.Session() as session:
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    })
 
         try:
             print("   Step 1: Accessing payment page...")
