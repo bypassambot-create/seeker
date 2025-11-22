@@ -373,16 +373,18 @@ def check_card(lista, url_payment_page):
     except Exception:
         return ('error', f"Invalid URL format: {url_payment_page}", "")
 
-    print("   Generating random user data...")
-    try:
-chars = string.ascii_lowercase + string.digits
-local_part = ''.join(random.choice(chars) for _ in range(15))
-email = local_part + "@gmail.com"
-        print(f"   Generated Email: {email}")
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Error fetching random user: {e}"
-        print(f"   {error_msg}")
-        return ('error', error_msg, "")
+print("   Generating random user data...")
+try:
+    chars = string.ascii_lowercase + string.digits
+    local_part = ''.join(random.choice(chars) for _ in range(15))
+    email = local_part + "@gmail.com"
+    print(f"   Generated Email: {email}")
+
+except requests.exceptions.RequestException as e:
+    error_msg = f"Error fetching random user: {e}"
+    print(f"   {error_msg}")
+    return ('error', error_msg, "")
+
 
     with requests.Session() as session:
         session.headers.update({
